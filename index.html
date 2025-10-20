@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaLens Pro - 专业图片元数据读取器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --bg-card: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --text-tertiary: #a1a1a6;
+            --border-color: #d2d2d7;
+            --accent: #007aff;
+            --accent-hover: #0051d5;
+            --accent-secondary: #5856d6;
+            --success: #34c759;
+            --warning: #ff9500;
+            --error: #ff3b30;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.08);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.12);
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #000000;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #1c1c1e;
+            --text-primary: #f5f5f7;
+            --text-secondary: #a1a1a6;
+            --text-tertiary: #86868b;
+            --border-color: #38383a;
+            --accent: #0a84ff;
+            --accent-hover: #409cff;
+            --accent-secondary: #5e5ce6;
+            --success: #30d158;
+            --warning: #ff9f0a;
+            --error: #ff453a;
+            --shadow-sm: 0 2px 10px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 20px 0;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(var(--bg-primary), 0.8);
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-toggle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            background: var(--accent);
+            color: white;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: flex;
+            gap: 30px;
+        }
+
+        .left-panel {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .right-panel {
+            flex: 2;
+            min-width: 0;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            background: var(--bg-card);
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 40px 30px;
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: var(--bg-secondary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--accent);
+            background: var(--bg-secondary);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            color: var(--accent);
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .paste-hint {
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .image-preview {
+            display: none;
+            margin-bottom: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .image-preview.active {
+            display: block;
+        }
+
+        .preview-container {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .preview-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+        }
+
+        .metadata-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .metadata-section.active {
+            display: block;
+        }
+
+        .metadata-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .metadata-tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .metadata-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .metadata-tab.active {
+            color: var(--accent);
+        }
+
+        .metadata-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .metadata-content {
+            display: none;
+        }
+
+        .metadata-content.active {
+            display: block;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .metadata-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .metadata-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-icon {
+            width: 18px;
+            height: 18px;
+            color: var(--accent);
+        }
+
+        .metadata-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        .metadata-item:last-child {
+            border-bottom: none;
+        }
+
+        .metadata-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .metadata-value {
+            color: var(--text-primary);
+            text-align: right;
+            max-width: 60%;
+            word-break: break-word;
+        }
+
+        .metadata-value.empty {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .metadata-value.prompt {
+            background: var(--bg-secondary);
+            padding: 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-width: 100%;
+            text-align: left;
+            margin-top: 8px;
+        }
+
+        .sd-detected {
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sd-detected::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+        }
+
+        .sd-detected-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .sd-detected-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sd-detected-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--accent-secondary);
+        }
+
+        .copy-button {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .copy-button:hover {
+            background: var(--accent-hover);
+        }
+
+        .copy-button.copied {
+            background: var(--success);
+        }
+
+        .copy-icon {
+            width: 16px;
+            height: 16px;
+        }
+
+        .sd-detected-content {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .sd-detected-footer {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .loading-text {
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            opacity: 0.3;
+        }
+
+        .error-state {
+            display: none;
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid var(--error);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin: 20px 0;
+            color: var(--error);
+        }
+
+        .error-state.active {
+            display: block;
+        }
+
+        .error-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error-icon {
+            width: 18px;
+            height: 18px;
+        }
+
+        .error-message {
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                max-width: 100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 20px 15px;
+            }
+
+            .upload-area {
+                padding: 30px 20px;
+            }
+
+            .metadata-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-container {
+                padding: 0 15px;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">MetaLens Pro</div>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+                    <svg id="themeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <div class="upload-text">点击或拖拽图片到此处</div>
+                    <div class="upload-subtext">支持 JPG, PNG, TIFF, RAW 等格式</div>
+                    <input type="file" class="file-input" id="fileInput" accept="image/*">
+                </div>
+                <div class="paste-hint">
+                    💡 提示：您也可以直接粘贴图片（Ctrl+V / Cmd+V）
+                </div>
+            </section>
+
+            <section class="image-preview" id="imagePreview">
+                <div class="preview-container">
+                    <img class="preview-image" id="previewImage" alt="预览图片">
+                </div>
+            </section>
+        </div>
+
+        <div class="right-panel">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div id="loadingText">正在读取图片元数据...</div>
+            </div>
+
+            <div class="error-state" id="errorState">
+                <div class="error-title">
+                    <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>读取失败</span>
+                </div>
+                <div class="error-message" id="errorMessage">无法读取图片，请稍后再试</div>
+            </div>
+
+            <section class="metadata-section" id="metadataSection">
+                <div class="sd-detected" id="sdDetected" style="display: none;">
+                    <div class="sd-detected-header">
+                        <div class="sd-detected-title">
+                            <svg class="sd-detected-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            <span>Stable Diffusion 生成信息</span>
+                        </div>
+                        <button class="copy-button" id="copySdButton">
+                            <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                            </svg>
+                            <span>复制</span>
+                        </button>
+                    </div>
+                    <div class="sd-detected-content" id="sdDetectedContent">
+                    </div>
+                    <div class="sd-detected-footer">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span>从图片元数据中提取</span>
+                    </div>
+                </div>
+
+                <div class="metadata-tabs" id="metadataTabs">
+                    <button class="metadata-tab active" data-tab="all">全部元数据</button>
+                    <button class="metadata-tab" data-tab="exif">EXIF</button>
+                    <button class="metadata-tab" data-tab="iptc">IPTC</button>
+                    <button class="metadata-tab" data-tab="xmp">XMP</button>
+                    <button class="metadata-tab" data-tab="sd">SD信息</button>
+                </div>
+                
+                <div class="metadata-content active" id="all-content">
+                    <div class="metadata-grid" id="allGrid">
+                    </div>
+                </div>
+                
+                <div class="metadata-content" id="exif-content">
+                    <div class="metadata-grid" id="exifGrid">
+                    </div>
+                </div>
+                
+                <div class="metadata-content" id="iptc-content">
+                    <div class="metadata-grid" id="iptcGrid">
+                    </div>
+                </div>
+                
+                <div class="metadata-content" id="xmp-content">
+                    <div class="metadata-grid" id="xmpGrid">
+                    </div>
+                </div>
+                
+                <div class="metadata-content" id="sd-content">
+                    <div class="metadata-grid" id="sdGrid">
+                    </div>
+                </div>
+            </section>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <h3>未检测到元数据</h3>
+                <p>这张图片可能不包含可读取的元数据信息</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/exifreader@4.13.0/dist/exif-reader.min.js"></script>
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const html = document.documentElement;
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        });
+
+        function updateThemeIcon(theme) {
+            if (theme === 'light') {
+                themeIcon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+            } else {
+                themeIcon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+            }
+        }
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImage = document.getElementById('previewImage');
+        const metadataSection = document.getElementById('metadataSection');
+        const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loadingText');
+        const emptyState = document.getElementById('emptyState');
+        const errorState = document.getElementById('errorState');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        const sdDetected = document.getElementById('sdDetected');
+        const sdDetectedContent = document.getElementById('sdDetectedContent');
+        const copySdButton = document.getElementById('copySdButton');
+        
+        const metadataTabs = document.querySelectorAll('.metadata-tab');
+        const metadataContents = document.querySelectorAll('.metadata-content');
+        
+        metadataTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                
+                metadataTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                metadataContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `${tabId}-content`) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImage(file);
+            }
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImage(file);
+            }
+        });
+
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    processImage(file);
+                    break;
+                }
+            }
+        });
+
+        async function processImage(file) {
+            loading.classList.add('active');
+            imagePreview.classList.remove('active');
+            metadataSection.classList.remove('active');
+            emptyState.style.display = 'none';
+            errorState.classList.remove('active');
+            sdDetected.style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                previewImage.src = e.target.result;
+                imagePreview.classList.add('active');
+                
+                try {
+                    await readMetadata(file, e.target.result);
+                } catch (error) {
+                    console.error('处理图片失败:', error);
+                    showError('处理图片时发生错误，请重试');
+                } finally {
+                    loading.classList.remove('active');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function readMetadata(file, imageSrc) {
+            try {
+                const tags = await ExifReader.load(file);
+                
+                const basicMetadata = {
+                    width: tags.ImageWidth ? tags.ImageWidth.description : '未知',
+                    height: tags.ImageHeight ? tags.ImageHeight.description : '未知',
+                    fileSize: formatFileSize(file.size),
+                    fileName: file.name,
+                    lastModified: new Date(file.lastModified).toLocaleString(),
+                    mimeType: file.type
+                };
+
+                const exifData = {};
+                const xmpData = {};
+                const sdData = {};
+
+                for (const [key, tag] of Object.entries(tags)) {
+                    if (tag.description) {
+                        exifData[key] = tag.description;
+                    }
+                }
+
+                const xmpTags = extractXMPData(file);
+                Object.assign(xmpData, xmpTags);
+
+                const sdTags = extractStableDiffusionData(xmpData, exifData);
+                Object.assign(sdData, sdTags);
+                
+                displayMetadata(basicMetadata, exifData, xmpData, sdData);
+                
+            } catch (error) {
+                console.error('读取元数据失败:', error);
+                throw error;
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        async function extractXMPData(file) {
+            const xmpData = {};
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                
+                const xmpStart = findXMPStart(uint8Array);
+                if (xmpStart === -1) return xmpData;
+                
+                const xmpEnd = findXMPEnd(uint8Array, xmpStart);
+                if (xmpEnd === -1) return xmpData;
+                
+                const xmpBytes = uint8Array.slice(xmpStart, xmpEnd);
+                const xmpString = new TextDecoder('utf-8', { fatal: false }).decode(xmpBytes);
+                
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmpString, 'text/xml');
+                
+                const dcTitle = getElementText(xmlDoc, ['dc\\:title', 'title']);
+                const dcDescription = getElementText(xmlDoc, ['dc\\:description', 'description']);
+                const dcCreator = getElementText(xmlDoc, ['dc\\:creator', 'creator']);
+                const dcRights = getElementText(xmlDoc, ['dc\\:rights', 'rights']);
+                const photoshopCredit = getElementText(xmlDoc, ['photoshop\\:Credit', 'Credit']);
+                const photoshopSource = getElementText(xmlDoc, ['photoshop\\:Source', 'Source']);
+                
+                if (dcTitle) xmpData.title = dcTitle;
+                if (dcDescription) xmpData.description = dcDescription;
+                if (dcCreator) xmpData.creator = dcCreator;
+                if (dcRights) xmpData.rights = dcRights;
+                if (photoshopCredit) xmpData.credit = photoshopCredit;
+                if (photoshopSource) xmpData.source = photoshopSource;
+                
+                const allElements = xmlDoc.querySelectorAll('*');
+                allElements.forEach(prop => {
+                    if (prop.textContent && prop.nodeName.includes(':')) {
+                        const propName = prop.nodeName.split(':').pop();
+                        if (!xmpData[propName] && prop.textContent.trim()) {
+                            xmpData[propName] = prop.textContent.trim();
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('XMP解析失败:', error);
+            }
+            
+            return xmpData;
+        }
+
+        function findXMPStart(uint8Array) {
+            const xmpStartMarker = [0x3C, 0x3F, 0x78, 0x70, 0x61, 0x63, 0x6B, 0x65, 0x74, 0x20, 0x62, 0x65, 0x67, 0x69, 0x6E, 0x3D, 0x22];
+            const xmpStartMarker2 = [0x3C, 0x78, 0x3A, 0x78, 0x6D, 0x70, 0x6D, 0x65, 0x74, 0x61, 0x20, 0x78, 0x6D, 0x6C, 0x6E, 0x73, 0x3A, 0x78, 0x3D, 0x22];
+            
+            for (let i = 0; i < uint8Array.length - xmpStartMarker.length; i++) {
+                let match = true;
+                for (let j = 0; j < xmpStartMarker.length; j++) {
+                    if (uint8Array[i + j] !== xmpStartMarker[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+                
+                match = true;
+                for (let j = 0; j < xmpStartMarker2.length; j++) {
+                    if (uint8Array[i + j] !== xmpStartMarker2[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            
+            return -1;
+        }
+
+        function findXMPEnd(uint8Array, startPos) {
+            const xmpEndMarker = [0x3C, 0x3F, 0x78, 0x70, 0x61, 0x63, 0x6B, 0x65, 0x74, 0x20, 0x65, 0x6E, 0x64, 0x3D, 0x22, 0x77, 0x22, 0x3F, 0x3E];
+            const xmpEndMarker2 = [0x3C, 0x2F, 0x78, 0x3A, 0x78, 0x6D, 0x70, 0x6D, 0x65, 0x74, 0x61, 0x3E];
+            
+            for (let i = startPos; i < uint8Array.length - xmpEndMarker.length; i++) {
+                let match = true;
+                for (let j = 0; j < xmpEndMarker.length; j++) {
+                    if (uint8Array[i + j] !== xmpEndMarker[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i + xmpEndMarker.length;
+                
+                match = true;
+                for (let j = 0; j < xmpEndMarker2.length; j++) {
+                    if (uint8Array[i + j] !== xmpEndMarker2[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i + xmpEndMarker2.length;
+            }
+            
+            return -1;
+        }
+
+        function getElementText(xmlDoc, selectors) {
+            for (const selector of selectors) {
+                const element = xmlDoc.querySelector(selector);
+                if (element && element.textContent) {
+                    return element.textContent.trim();
+                }
+            }
+            return null;
+        }
+
+        function extractStableDiffusionData(xmpData, exifTags) {
+            const sdData = {};
+            
+            if (xmpData) {
+                const promptFields = ['prompt', 'Prompt', 'sd:prompt', 'stability:prompt', 'midjourney:prompt', 'dall-e:prompt', 'description'];
+                
+                for (const field of promptFields) {
+                    if (xmpData[field]) {
+                        sdData.prompt = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const negativePromptFields = ['negative_prompt', 'NegativePrompt', 'sd:negative_prompt', 'stability:negative_prompt'];
+                
+                for (const field of negativePromptFields) {
+                    if (xmpData[field]) {
+                        sdData.negativePrompt = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const modelFields = ['model', 'Model', 'sd:model', 'stability:model', 'midjourney:model', 'dall-e:model'];
+                
+                for (const field of modelFields) {
+                    if (xmpData[field]) {
+                        sdData.model = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const samplerFields = ['sampler', 'Sampler', 'sd:sampler', 'stability:sampler'];
+                
+                for (const field of samplerFields) {
+                    if (xmpData[field]) {
+                        sdData.sampler = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const seedFields = ['seed', 'Seed', 'sd:seed', 'stability:seed'];
+                
+                for (const field of seedFields) {
+                    if (xmpData[field]) {
+                        sdData.seed = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const stepsFields = ['steps', 'Steps', 'sd:steps', 'stability:steps'];
+                
+                for (const field of stepsFields) {
+                    if (xmpData[field]) {
+                        sdData.steps = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const cfgFields = ['cfg_scale', 'CFGScale', 'sd:cfg_scale', 'stability:cfg_scale', 'cfg'];
+                
+                for (const field of cfgFields) {
+                    if (xmpData[field]) {
+                        sdData.cfgScale = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const widthFields = ['width', 'Width', 'sd:width', 'stability:width'];
+                
+                for (const field of widthFields) {
+                    if (xmpData[field]) {
+                        sdData.width = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const heightFields = ['height', 'Height', 'sd:height', 'stability:height'];
+                
+                for (const field of heightFields) {
+                    if (xmpData[field]) {
+                        sdData.height = xmpData[field];
+                        break;
+                    }
+                }
+                
+                const toolFields = ['software', 'Software', 'generator', 'Generator', 'tool', 'Tool', 'creator', 'Creator'];
+                
+                for (const field of toolFields) {
+                    if (xmpData[field]) {
+                        sdData.tool = xmpData[field];
+                        break;
+                    }
+                }
+            }
+            
+            if (exifTags) {
+                if (exifTags.Software) {
+                    if (!sdData.tool) {
+                        sdData.tool = exifTags.Software;
+                    }
+                }
+                
+                if (exifTags.ImageDescription) {
+                    if (!sdData.prompt) {
+                        sdData.prompt = exifTags.ImageDescription;
+                    }
+                }
+            }
+            
+            return sdData;
+        }
+
+        function formatStableDiffusionInfo(sdData) {
+            if (!sdData.prompt && !sdData.model && !sdData.seed) {
+                return '未检测到Stable Diffusion生成信息';
+            }
+            
+            let info = '';
+            
+            if (sdData.prompt) {
+                info += `提示词: ${sdData.prompt}\n`;
+            }
+            
+            if (sdData.negativePrompt) {
+                info += `负面提示词: ${sdData.negativePrompt}\n`;
+            }
+            
+            if (sdData.model) {
+                info += `模型: ${sdData.model}\n`;
+            }
+            
+            if (sdData.sampler) {
+                info += `采样器: ${sdData.sampler}\n`;
+            }
+            
+            if (sdData.seed) {
+                info += `种子: ${sdData.seed}\n`;
+            }
+            
+            if (sdData.steps) {
+                info += `步数: ${sdData.steps}\n`;
+            }
+            
+            if (sdData.cfgScale) {
+                info += `CFG: ${sdData.cfgScale}\n`;
+            }
+            
+            if (sdData.width) {
+                info += `宽度: ${sdData.width}\n`;
+            }
+            
+            if (sdData.height) {
+                info += `高度: ${sdData.height}\n`;
+            }
+            
+            if (sdData.tool) {
+                info += `工具: ${sdData.tool}\n`;
+            }
+            
+            return info || '未检测到Stable Diffusion生成信息';
+        }
+
+        copySdButton.addEventListener('click', () => {
+            const sdText = sdDetectedContent.textContent;
+            navigator.clipboard.writeText(sdText).then(() => {
+                copySdButton.classList.add('copied');
+                copySdButton.innerHTML = `
+                    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>已复制</span>
+                `;
+                
+                setTimeout(() => {
+                    copySdButton.classList.remove('copied');
+                    copySdButton.innerHTML = `
+                        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                        </svg>
+                        <span>复制</span>
+                    `;
+                }, 2000);
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorState.classList.add('active');
+            
+            setTimeout(() => {
+                errorState.classList.remove('active');
+            }, 5000);
+        }
+
+        function displayMetadata(basicMetadata, exifData, xmpData, sdData) {
+            document.getElementById('allGrid').innerHTML = '';
+            document.getElementById('exifGrid').innerHTML = '';
+            document.getElementById('iptcGrid').innerHTML = '';
+            document.getElementById('xmpGrid').innerHTML = '';
+            document.getElementById('sdGrid').innerHTML = '';
+            
+            const allGrid = document.getElementById('allGrid');
+            
+            const basicCard = createMetadataCard('基础信息', {
+                '文件名': basicMetadata.fileName || '未知',
+                '文件大小': basicMetadata.fileSize || '未知',
+                '修改时间': basicMetadata.lastModified || '未知',
+                'MIME类型': basicMetadata.mimeType || '未知',
+                '图片宽度': basicMetadata.width || '未知',
+                '图片高度': basicMetadata.height || '未知'
+            });
+            allGrid.appendChild(basicCard);
+            
+            const cameraCard = createMetadataCard('相机信息', {
+                '相机制造商': exifData.Make || xmpData.make || '未知',
+                '相机型号': exifData.Model || xmpData.model || '未知',
+                '镜头型号': exifData.LensModel || '未知',
+                '序列号': exifData.SerialNumber || '未知'
+            });
+            allGrid.appendChild(cameraCard);
+            
+            const paramsCard = createMetadataCard('拍摄参数', {
+                '光圈': exifData.FNumber ? `f/${exifData.FNumber}` : '未知',
+                '快门速度': exifData.ExposureTime ? `${exifData.ExposureTime}s` : '未知',
+                'ISO': exifData.ISOSpeedRatings || '未知',
+                '焦距': exifData.FocalLength ? `${exifData.FocalLength}mm` : '未知',
+                '闪光灯': exifData.Flash ? (exifData.Flash === 0 ? '关闭' : '开启') : '未知',
+                '白平衡': exifData.WhiteBalance || '未知'
+            });
+            allGrid.appendChild(paramsCard);
+            
+            const imageCard = createMetadataCard('图像信息', {
+                '宽度': exifData.ExifImageWidth || basicMetadata.width || '未知',
+                '高度': exifData.ExifImageHeight || basicMetadata.height || '未知',
+                '分辨率': exifData.XResolution ? `${exifData.XResolution} × ${exifData.YResolution}` : '未知',
+                '色彩空间': exifData.ColorSpace || '未知',
+                '压缩': exifData.Compression || '未知'
+            });
+            allGrid.appendChild(imageCard);
+            
+            const gpsCard = createMetadataCard('GPS信息', {
+                '纬度': exifData.GPSLatitude ? formatGPS(exifData.GPSLatitude, exifData.GPSLatitudeRef) : '未知',
+                '经度': exifData.GPSLongitude ? formatGPS(exifData.GPSLongitude, exifData.GPSLongitudeRef) : '未知',
+                '海拔': exifData.GPSAltitude ? `${exifData.GPSAltitude}m` : '未知',
+                '拍摄时间': exifData.DateTimeOriginal || exifData.DateTimeDigitized || '未知'
+            });
+            allGrid.appendChild(gpsCard);
+            
+            const xmpCard = createMetadataCard('XMP/IPTC信息', {
+                '标题': xmpData.title || exifData.ImageDescription || '未知',
+                '描述': xmpData.description || exifData.ImageDescription || '未知',
+                '作者': xmpData.creator || exifData.Artist || '未知',
+                '版权': xmpData.rights || exifData.Copyright || '未知',
+                '软件': xmpData.software || exifData.Software || '未知',
+                '来源': xmpData.source || '未知'
+            });
+            allGrid.appendChild(xmpCard);
+            
+            if (sdData.prompt || sdData.model || sdData.seed) {
+                const sdCard = createMetadataCard('Stable Diffusion信息', {
+                    '提示词': sdData.prompt || '未知',
+                    '负面提示词': sdData.negativePrompt || '未知',
+                    '模型': sdData.model || '未知',
+                    '采样器': sdData.sampler || '未知',
+                    '种子': sdData.seed || '未知',
+                    '步数': sdData.steps || '未知',
+                    'CFG': sdData.cfgScale || '未知',
+                    '尺寸': (sdData.width && sdData.height) ? `${sdData.width}×${sdData.height}` : '未知',
+                    '工具': sdData.tool || '未知'
+                });
+                allGrid.appendChild(sdCard);
+                
+                const sdInfo = formatStableDiffusionInfo(sdData);
+                sdDetectedContent.textContent = sdInfo;
+                sdDetected.style.display = 'block';
+            }
+            
+            const exifGrid = document.getElementById('exifGrid');
+            for (const [key, value] of Object.entries(exifData)) {
+                const item = createMetadataItem(key, value);
+                exifGrid.appendChild(item);
+            }
+            
+            const iptcGrid = document.getElementById('iptcGrid');
+            for (const [key, value] of Object.entries(xmpData)) {
+                if (key.includes('creator') || key.includes('rights') || key.includes('title') || key.includes('description')) {
+                    const item = createMetadataItem(key, value);
+                    iptcGrid.appendChild(item);
+                }
+            }
+            
+            const xmpGrid = document.getElementById('xmpGrid');
+            for (const [key, value] of Object.entries(xmpData)) {
+                const item = createMetadataItem(key, value);
+                xmpGrid.appendChild(item);
+            }
+            
+            const sdGrid = document.getElementById('sdGrid');
+            for (const [key, value] of Object.entries(sdData)) {
+                const item = createMetadataItem(key, value);
+                sdGrid.appendChild(item);
+            }
+            
+            metadataSection.classList.add('active');
+            
+            const hasMetadata = Object.keys(exifData).length > 0 || Object.keys(xmpData).length > 0 || Object.keys(sdData).length > 0;
+            if (!hasMetadata) {
+                emptyState.style.display = 'block';
+                metadataSection.classList.remove('active');
+            }
+        }
+
+        function formatGPS(coord, ref) {
+            if (!coord) return null;
+            const degrees = coord[0];
+            const minutes = coord[1];
+            const seconds = coord[2];
+            const decimal = degrees + minutes / 60 + seconds / 3600;
+            return `${decimal.toFixed(6)}° ${ref || ''}`;
+        }
+
+        function createMetadataCard(title, data) {
+            const card = document.createElement('div');
+            card.className = 'metadata-card';
+            
+            const cardTitle = document.createElement('div');
+            cardTitle.className = 'card-title';
+            
+            let iconSvg = '';
+            if (title.includes('基础信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>';
+            } else if (title.includes('相机信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
+            } else if (title.includes('拍摄参数')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6m4.22-13.22l4.24 4.24M1.54 9.96l4.24 4.24M1.54 14.04l4.24-4.24M18.46 14.04l4.24-4.24"></path></svg>';
+            } else if (title.includes('图像信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+            } else if (title.includes('GPS信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+            } else if (title.includes('XMP/IPTC信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+            } else if (title.includes('Stable Diffusion信息')) {
+                iconSvg = '<svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>';
+            }
+            
+            cardTitle.innerHTML = iconSvg + title;
+            card.appendChild(cardTitle);
+            
+            for (const [key, value] of Object.entries(data)) {
+                const item = createMetadataItem(key, value);
+                card.appendChild(item);
+            }
+            
+            return card;
+        }
+
+        function createMetadataItem(key, value) {
+            const item = document.createElement('div');
+            item.className = 'metadata-item';
+            
+            const label = document.createElement('span');
+            label.className = 'metadata-label';
+            label.textContent = key;
+            
+            const val = document.createElement('span');
+            val.className = value === '未知' ? 'metadata-value empty' : 'metadata-value';
+            val.textContent = value;
+            
+            item.appendChild(label);
+            item.appendChild(val);
+            
+            return item;
+        }
+    </script>
+</body>
+</html>
